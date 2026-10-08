@@ -1,5 +1,6 @@
 """FastAPI application factory."""
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -7,19 +8,27 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import Settings, load_settings
-from app.database import connect, init_schema, is_seeded
+from app.database import connect, describe_database, init_schema, is_seeded
 from app.errors import register_error_handlers
 from app.routers import course, dev, health, leaderboard, me, sessions
 from app.seed import seed_database
 
 
+logger = logging.getLogger("uvicorn.error")
+
+
 def bootstrap_database(settings: Settings) -> None:
-    """Create the schema and seed the course on first start."""
-    settings.database_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = connect(settings.database_path)
+    """Create any missing tables and seed the course on first start.
+
+    If Turso is configured but unreachable this raises, so the app fails fast
+    instead of silently writing to a throwaway local file.
+    """
+    logger.info("Database: %s", describe_database(settings))
+    conn = connect(settings)
     try:
         init_schema(conn)
         if not is_seeded(conn):
+            logger.info("Database is empty; seeding the demo course")
             seed_database(conn)
     finally:
         conn.close()

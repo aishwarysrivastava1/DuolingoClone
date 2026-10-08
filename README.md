@@ -3,7 +3,7 @@
 A full-stack recreation of the Duolingo web app: the learning path, the lesson
 player and the gamification loop (XP, streaks, hearts, crowns, daily goal,
 leaderboard, achievements), built with **Next.js + TypeScript**, **FastAPI** and
-**SQLite**.
+**SQLite** (a local file in development, **Turso** cloud SQLite in production).
 
 | Learning path | Lesson player | Lesson complete |
 | :---: | :---: | :---: |
@@ -48,7 +48,7 @@ More screens live in [`docs/screenshots`](docs/screenshots).
 **Gamification and progress**
 - Daily **streak** with a week calendar, **XP** totals, **daily goal** (10 / 20 / 30 / 50 XP), **hearts regeneration** over time plus **refill** (mocked gems) and **practice to earn hearts**.
 - **Leaderboard** across seeded learners (this week / all time, promotion zone), **daily quests**, and **achievements** with progress bars.
-- Everything persists in SQLite and survives reloads.
+- Everything persists in the database and survives reloads (and, on Turso, server restarts).
 
 **Everything else**
 - Profile with statistics, course progress and achievements; Shop (refill hearts, practice, "coming soon" items); Settings (name, daily goal, sound, **dark mode**, placeholders).
@@ -61,7 +61,7 @@ More screens live in [`docs/screenshots`](docs/screenshots).
 | --- | --- |
 | Frontend | Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS v4 |
 | Backend | Python 3.11+, FastAPI, Pydantic v2, Uvicorn |
-| Database | SQLite via the standard-library `sqlite3` module (hand-written schema, no ORM) |
+| Database | Hand-written SQLite schema, no ORM: stdlib `sqlite3` locally, [Turso](https://turso.tech) (libSQL) via the official `libsql` client in production |
 | Tests | pytest + FastAPI `TestClient` (backend); `tsc` + ESLint (frontend) |
 
 No UI kit or state library: the design system lives in `globals.css` (tokens + component classes),
@@ -81,7 +81,9 @@ pip install -r requirements-dev.txt
 uvicorn app.main:app --reload --port 8000
 ```
 
-The database (`backend/data/duolingo.db`) is created and seeded automatically on first start.
+By default the backend uses a local SQLite file (`backend/data/duolingo.db`), created and seeded
+automatically on first start; to use Turso instead see [Database: Turso](#3-database-turso-cloud-sqlite).
+Backend settings can also go in `backend/.env` (template: [`backend/.env.example`](backend/.env.example)).
 Interactive API docs are at http://localhost:8000/docs.
 
 To wipe and re-seed at any time:
@@ -102,12 +104,43 @@ npm run dev
 Open http://localhost:3000. You're signed in as the seeded learner **Alex**, who has a 4-day streak,
 4/5 hearts, two crowned skills and is part-way through *At the café*.
 
+### 3. Database: Turso (cloud SQLite)
+
+Render's free tier wipes the local disk on every restart, so in production the backend stores
+data in a [Turso](https://turso.tech) database. Same schema, same queries; only the connection changes.
+
+**Get the two values** with the [Turso CLI](https://docs.turso.tech/cli/introduction)
+(`brew install tursodatabase/tap/turso`, or `curl -sSfL https://get.tur.so/install.sh | bash`).
+In the Turso dashboard you can also copy a database's URL and create a token from its page.
+
+```bash
+turso auth login
+turso db create duolingo-clone             # choose a location close to your backend host
+turso db show duolingo-clone --url         # → TURSO_DATABASE_URL  (libsql://…turso.io)
+turso db tokens create duolingo-clone      # → TURSO_AUTH_TOKEN
+```
+
+**Test the connection locally:**
+
+```bash
+cd backend
+cp .env.example .env                       # paste both values into backend/.env
+python scripts/init_db.py                  # connect, create missing tables, seed if empty
+uvicorn app.main:app --reload --port 8000  # logs "Database: Turso (libsql://…)"
+```
+
+`init_db.py` reports round-trip latency, which tables it created, whether foreign keys are
+enforced and row counts, and exits non-zero with a hint on a bad URL or token (`--reset` wipes
+and re-seeds). Leave both variables empty to fall back to the local SQLite file.
+
 ### Configuration
 
 | Variable | Where | Default | Purpose |
 | --- | --- | --- | --- |
 | `NEXT_PUBLIC_API_URL` | frontend | `http://localhost:8000` | Backend base URL |
-| `DATABASE_PATH` | backend | `backend/data/duolingo.db` | SQLite file location |
+| `TURSO_DATABASE_URL` | backend | unset | Turso database URL; when set it replaces the local SQLite file |
+| `TURSO_AUTH_TOKEN` | backend | unset | Turso database auth token |
+| `DATABASE_PATH` | backend | `backend/data/duolingo.db` | Local SQLite file, used when Turso isn't configured |
 | `CORS_ORIGINS` | backend | `http://localhost:3000,http://127.0.0.1:3000` | Allowed frontend origins (comma-separated) |
 | `CORS_ORIGIN_REGEX` | backend | unset | Extra origin pattern, e.g. `https://.*\.vercel\.app` |
 | `HEART_REGEN_MINUTES` | backend | `30` | Minutes to regenerate one heart |
@@ -133,12 +166,12 @@ Open http://localhost:3000. You're signed in as the seeded learner **Alex**, who
 │             hearts · streaks · grading   (pure, unit-tested rules)  │
 │             learner · achievements · leaderboard · guidebook        │
 │ schemas.py  Pydantic request/response contracts                     │
-│ database.py sqlite3 connections + explicit BEGIN IMMEDIATE txns     │
+│ database.py local SQLite or Turso (libSQL), BEGIN IMMEDIATE txns    │
 │ clock.py    real time + simulated day offset, learner's timezone    │
 │ seed/       course content → generated lessons → learners           │
 └───────────────────────────────┬─────────────────────────────────────┘
                                 │
-                        SQLite (data/duolingo.db)
+         SQLite file (local dev)  or  Turso / libSQL (production)
 ```
 
 Key decisions:
@@ -152,7 +185,13 @@ Key decisions:
   timestamps instead of by background jobs. `GET` requests never write.
 - **Explicit transactions.** Connections run in autocommit mode and every write path uses
   `BEGIN IMMEDIATE`, which serialises concurrent requests (e.g. a double-submitted answer or a
-  double "complete") on SQLite's write lock.
+  double "complete") on the database's write lock. Write transactions are also serialised within
+  the process, because the libSQL client handles one call at a time per process and a writer
+  waiting for the lock would otherwise stall the one holding it.
+- **One schema, two engines.** `database.py` picks Turso when `TURSO_DATABASE_URL` is set and wraps
+  the `libsql` client so it behaves like `sqlite3` here: rows by column name, `:named` parameters,
+  and `executemany` sent as multi-row inserts (each statement is a network round trip). No service
+  query changed. Create the Turso database in the region closest to the backend.
 - **Testable time.** `Clock` combines the real time, a simulated day offset (`app_state`) and the
   learner's timezone (sent as `X-Timezone`), so streak behaviour can be demoed and tested.
 - **Thin layers.** Routers only parse HTTP and open a transaction; services hold the logic; pure
@@ -169,7 +208,9 @@ backend/
     routers/           HTTP endpoints
     services/          business logic (see diagram above)
     seed/              content.py (course material), lessons.py (exercise builder), seeder.py
-  tests/               test_rules.py (pure rules), test_api.py (end-to-end API flows)
+  scripts/init_db.py   verify the database connection, create missing tables, seed / reset
+  tests/               rules, API flows, health check, database adapter, init script
+  .env.example         backend settings template (Turso URL and token)
 frontend/
   src/app/             routes (App Router)
   src/components/      shell/, path/, lesson/ (+ exercises/), widgets/, ui/, icons, mascot
@@ -357,8 +398,12 @@ Codes: `skill_locked` (403), `out_of_hearts`, `skill_legendary`, `nothing_to_pra
 ## Testing
 
 ```bash
-# backend — 47 tests: pure rules + full API flows on a temporary database
+# backend — 59 tests: pure rules + full API flows on a temporary SQLite database
 cd backend && pytest
+
+# the same suite against a libSQL server, e.g. a throwaway Turso database or `turso dev`
+# (it is wiped for every test, so never point it at real data)
+TEST_TURSO_DATABASE_URL=http://127.0.0.1:8080 TEST_TURSO_AUTH_TOKEN= pytest
 
 # frontend — type check, lint and production build
 cd frontend && npm run typecheck && npm run lint && npm run build
@@ -376,10 +421,11 @@ mode, persistence after reload, and slow / failing network requests.
 ## Deployment
 
 **Backend → Render.** [`render.yaml`](render.yaml) is a ready blueprint (root `backend/`,
-`uvicorn app.main:app`). Set `CORS_ORIGINS` to the frontend URL. On a free instance the
-filesystem is ephemeral, so the database is re-seeded on each restart; attach a disk and set
-`DATABASE_PATH=/var/data/duolingo.db` for durable progress. Any host that runs a Python web
-process works the same way.
+`uvicorn app.main:app`). Set `CORS_ORIGINS` to the frontend URL, and `TURSO_DATABASE_URL` /
+`TURSO_AUTH_TOKEN` so progress lives in Turso and survives restarts and deploys. Without them the
+service falls back to a local SQLite file, which Render's free tier wipes on every restart. Tables
+are created on startup; running `python scripts/init_db.py` locally with the same values first
+lets you confirm the connection. Any host that runs a Python web process works the same way.
 
 **Frontend → Vercel.** Import the repo, set **Root Directory** to `frontend`, and add
 `NEXT_PUBLIC_API_URL=https://<your-backend>`.
