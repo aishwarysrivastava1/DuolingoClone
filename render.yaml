@@ -1,9 +1,11 @@
 # Render blueprint for the FastAPI backend (https://render.com/docs/blueprint-spec).
-# The frontend deploys to Vercel with Root Directory = frontend (see README).
+# The frontend deploys to Vercel (root directory: frontend) and the data lives in Turso.
 services:
   - type: web
     name: duolingo-clone-api
     runtime: python
+    plan: free # without this Render defaults to a paid "starter" instance
+    region: oregon # keep it close to your Turso database's region
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
@@ -11,15 +13,21 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.7
-      # Comma-separated list of exact frontend origins, e.g. https://my-app.vercel.app
-      - key: CORS_ORIGINS
-        sync: false
-      # Also allow Vercel preview deployments.
-      - key: CORS_ORIGIN_REGEX
-        value: https://.*\.vercel\.app
-      # Turso database (see README "Database: Turso"). Without these the service
-      # falls back to a local SQLite file, which Render wipes on every restart.
+      # Turso database. Without these the service falls back to a local SQLite
+      # file, which Render wipes on every restart, deploy and spin-down.
       - key: TURSO_DATABASE_URL
         sync: false
       - key: TURSO_AUTH_TOKEN
         sync: false
+      # Exact frontend origin(s), comma-separated, e.g. https://duolingo-clone.vercel.app
+      - key: CORS_ORIGINS
+        sync: false
+      # Optional: allow this project's Vercel preview deployments, scoped to your team, e.g.
+      # https://duolingo-clone-[a-z0-9-]+-<your-team-slug>\.vercel\.app
+      # (Avoid https://.*\.vercel\.app — that would allow every site hosted on Vercel.)
+      - key: CORS_ORIGIN_REGEX
+        sync: false
+      # "Next day" and "Reset demo data" in Settings. Anyone with the URL can use
+      # them; set to false to remove them once the demo is no longer needed.
+      - key: ENABLE_DEV_ROUTES
+        value: "true"

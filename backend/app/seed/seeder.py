@@ -6,11 +6,10 @@ dozen rival learners for the leaderboard. Dates are relative to "today" so a
 fresh seed always looks like an active learner.
 """
 
-import sqlite3
 from datetime import timedelta
 
 from app.clock import Clock, current_clock
-from app.database import transaction
+from app.database import Connection, transaction
 from app.seed.content import SPANISH, CourseContent
 from app.seed.lessons import build_lessons
 from app.services import achievements
@@ -82,7 +81,7 @@ RIVALS = (
 )
 
 
-def _insert_course(conn: sqlite3.Connection, course: CourseContent) -> int:
+def _insert_course(conn: Connection, course: CourseContent) -> int:
     """Write the course tree with one bulk insert per table.
 
     Ids are assigned here rather than read back with ``lastrowid`` so the ~1,200
@@ -160,7 +159,7 @@ def _insert_course(conn: sqlite3.Connection, course: CourseContent) -> int:
     return course_id
 
 
-def _insert_achievements(conn: sqlite3.Connection) -> None:
+def _insert_achievements(conn: Connection) -> None:
     conn.executemany(
         "INSERT INTO achievements (code, title, description, icon, metric, threshold, position) "
         "VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -168,7 +167,7 @@ def _insert_achievements(conn: sqlite3.Connection) -> None:
     )
 
 
-def _insert_learner(conn: sqlite3.Connection, course_id: int, clock: Clock) -> int:
+def _insert_learner(conn: Connection, course_id: int, clock: Clock) -> int:
     today = clock.today
     streak_days = [days for days in sorted(LEARNER_ACTIVITY) if days <= 4]
     user_id = conn.execute(
@@ -227,7 +226,7 @@ def _insert_learner(conn: sqlite3.Connection, course_id: int, clock: Clock) -> i
     return user_id
 
 
-def _insert_rivals(conn: sqlite3.Connection, course_id: int, clock: Clock) -> None:
+def _insert_rivals(conn: Connection, course_id: int, clock: Clock) -> None:
     today = clock.today
     days_this_week = today.weekday() + 1
     for display_name, color, total_xp, weekly_xp in RIVALS:
@@ -268,7 +267,7 @@ def _insert_rivals(conn: sqlite3.Connection, course_id: int, clock: Clock) -> No
         )
 
 
-def seed_database(conn: sqlite3.Connection, timezone_name: str | None = None) -> None:
+def seed_database(conn: Connection, timezone_name: str | None = None) -> None:
     """Wipe all data and write a fresh, deterministic dataset."""
     with transaction(conn):
         for table in _TABLES_IN_DELETE_ORDER:

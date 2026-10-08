@@ -9,11 +9,12 @@ are derived from how many times the learner finished each of its lessons:
 * unlocked         = first skill of the course, or previous skill has ≥ 1 crown
 """
 
-import sqlite3
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 
+from app.database import Connection
 from app.rules import MAX_CROWN_LEVEL
+from app.schemas import SkillState
 
 
 @dataclass
@@ -56,7 +57,7 @@ class SkillProgress:
         return None if index is None else self.lesson_ids[index]
 
     @property
-    def state(self) -> str:
+    def state(self) -> SkillState:
         if self.crown_level >= 1:
             return "completed"
         return "active" if self.unlocked else "locked"
@@ -121,7 +122,7 @@ ORDER BY u.position, s.position, l.position
 """
 
 
-def load_course_path(conn: sqlite3.Connection, user_id: int, course_id: int) -> CoursePath:
+def load_course_path(conn: Connection, user_id: int, course_id: int) -> CoursePath:
     units: dict[int, UnitProgress] = {}
     skills: dict[int, SkillProgress] = {}
     for row in conn.execute(_PATH_QUERY, {"user_id": user_id, "course_id": course_id}):

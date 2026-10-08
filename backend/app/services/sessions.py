@@ -10,13 +10,18 @@ session has been answered correctly at least once.
 """
 
 import random
-import sqlite3
 from datetime import datetime, timedelta
 
 from app import schemas
 from app.clock import Clock
+from app.database import Connection, Row
 from app.errors import AppError
-from app.rules import MAX_CROWN_LEVEL, PERFECT_LESSON_BONUS_XP, PRACTICE_SESSION_SIZE, PRACTICE_XP
+from app.rules import (
+    MAX_CROWN_LEVEL,
+    PERFECT_LESSON_BONUS_XP,
+    PRACTICE_SESSION_SIZE,
+    PRACTICE_XP,
+)
 from app.services import achievements, learner
 from app.services import hearts as heart_rules
 from app.services.grading import grade
@@ -36,7 +41,7 @@ WHERE se.session_id = ?
 # --- helpers -------------------------------------------------------------------
 
 
-def _get_session(conn: sqlite3.Connection, user_id: int, session_id: int) -> sqlite3.Row:
+def _get_session(conn: Connection, user_id: int, session_id: int) -> Row:
     row = conn.execute(
         "SELECT * FROM lesson_sessions WHERE id = ? AND user_id = ?", (session_id, user_id)
     ).fetchone()
@@ -45,7 +50,7 @@ def _get_session(conn: sqlite3.Connection, user_id: int, session_id: int) -> sql
     return row
 
 
-def _require_active(session: sqlite3.Row) -> None:
+def _require_active(session: Row) -> None:
     if session["status"] != "active":
         raise AppError(409, "session_closed", "This session has already ended.")
 
@@ -54,7 +59,7 @@ def _placeholders(values: list[int]) -> str:
     return ", ".join("?" for _ in values)
 
 
-def _exercises_out(conn: sqlite3.Connection, exercise_ids: list[int]) -> list[schemas.ExerciseOut]:
+def _exercises_out(conn: Connection, exercise_ids: list[int]) -> list[schemas.ExerciseOut]:
     """Client-safe exercise payloads in play order (no correctness flags)."""
     marks = _placeholders(exercise_ids)
     rows = {row["id"]: row for row in conn.execute(f"SELECT * FROM exercises WHERE id IN ({marks})", exercise_ids)}
@@ -90,7 +95,7 @@ def _exercises_out(conn: sqlite3.Connection, exercise_ids: list[int]) -> list[sc
     return payloads
 
 
-def _exercise_ids_for_lessons(conn: sqlite3.Connection, lesson_ids: list[int]) -> list[int]:
+def _exercise_ids_for_lessons(conn: Connection, lesson_ids: list[int]) -> list[int]:
     query = f"SELECT id FROM exercises WHERE lesson_id IN ({_placeholders(lesson_ids)}) ORDER BY lesson_id, position"
     return [row["id"] for row in conn.execute(query, lesson_ids)]
 
@@ -106,7 +111,7 @@ def _find_skill(path: CoursePath, skill_id: int) -> SkillProgress:
 
 
 def start_session(
-    conn: sqlite3.Connection,
+    conn: Connection,
     user_id: int,
     request: schemas.SessionCreate,
     clock: Clock,
@@ -176,7 +181,7 @@ def start_session(
 
 
 def submit_answer(
-    conn: sqlite3.Connection,
+    conn: Connection,
     user_id: int,
     session_id: int,
     submission: schemas.AnswerSubmit,
@@ -233,7 +238,7 @@ def submit_answer(
 
 
 def complete_session(
-    conn: sqlite3.Connection, user_id: int, session_id: int, clock: Clock, regen: timedelta
+    conn: Connection, user_id: int, session_id: int, clock: Clock, regen: timedelta
 ) -> schemas.CompletionOut:
     session = _get_session(conn, user_id, session_id)
     _require_active(session)
@@ -277,7 +282,7 @@ def complete_session(
     conn.execute(
         "UPDATE users SET total_xp = total_xp + ?, current_streak = ?, longest_streak = ?, last_active_on = ? "
         "WHERE id = ?",
-        (xp_earned, streak.current, streak.longest, clock.today.isoformat(), user_id),
+        (xp_earned, streak.current, streak.longest, streak.active_on.isoformat(), user_id),
     )
 
     hearts_before = learner.current_hearts(user, clock.now, regen)
@@ -359,7 +364,7 @@ def complete_session(
 # --- abandon -------------------------------------------------------------------
 
 
-def abandon_session(conn: sqlite3.Connection, user_id: int, session_id: int, clock: Clock) -> None:
+def abandon_session(conn: Connection, user_id: int, session_id: int, clock: Clock) -> None:
     """Close a session the learner quit. Hearts already lost stay lost."""
     _get_session(conn, user_id, session_id)
     conn.execute(

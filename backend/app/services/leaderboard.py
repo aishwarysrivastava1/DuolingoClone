@@ -1,10 +1,10 @@
 """Leaderboard: weekly league (XP since Monday) or all-time XP."""
 
-import sqlite3
 from datetime import date, timedelta
 from typing import Literal
 
 from app import schemas
+from app.database import Connection
 
 LEAGUE_NAME = "Bronze"
 PROMOTION_CUTOFF = 5
@@ -28,7 +28,7 @@ ORDER BY xp DESC, display_name
 
 
 def get_leaderboard(
-    conn: sqlite3.Connection, user_id: int, period: Literal["week", "all"], today: date
+    conn: Connection, user_id: int, period: Literal["week", "all"], today: date
 ) -> schemas.LeaderboardOut:
     course_id = conn.execute("SELECT course_id FROM users WHERE id = ?", (user_id,)).fetchone()["course_id"]
     monday = today - timedelta(days=today.weekday())

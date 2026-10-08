@@ -9,6 +9,7 @@ import { Toggle } from "@/components/ui/Toggle";
 import { useTheme } from "@/context/ThemeContext";
 import { useToast } from "@/context/ToastContext";
 import { useUser } from "@/context/UserContext";
+import { useApiResource } from "@/hooks/useApiResource";
 import { api, toApiError } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { parseLocalDate } from "@/lib/format";
@@ -41,6 +42,8 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [devBusy, setDevBusy] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
+  // Demo tools only exist when the backend enables them (ENABLE_DEV_ROUTES); 404 otherwise.
+  const devClock = useApiResource("dev-clock", api.devClock);
 
   if (!me) return null;
 
@@ -60,6 +63,7 @@ export default function SettingsPage() {
     setDevBusy(true);
     try {
       const clock = await action();
+      devClock.reload();
       await refresh();
       toast(message(clock.today), { icon: "🕒" });
     } catch (error) {
@@ -70,6 +74,8 @@ export default function SettingsPage() {
   };
 
   const today = parseLocalDate(me.today).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  const dayOffset = devClock.data?.day_offset ?? 0;
+  const todayLabel = dayOffset > 0 ? `${today} (simulated, +${dayOffset} day${dayOffset === 1 ? "" : "s"})` : today;
 
   return (
     <div className="flex flex-col gap-8">
@@ -133,24 +139,26 @@ export default function SettingsPage() {
         </Row>
       </section>
 
-      <section className="card border-dashed px-5 py-2">
-        <h2 className="pt-3 text-lg font-extrabold">Demo tools</h2>
-        <p className="text-sm text-muted">Simulate time passing to test streaks, daily goals and heart regeneration.</p>
-        <Row title="Today is" description={today}>
-          <Button
-            variant="outline"
-            disabled={devBusy}
-            onClick={() => void runDevAction(() => api.advanceDay(1), () => "Moved to the next day")}
-          >
-            Next day
-          </Button>
-        </Row>
-        <Row title="Reset demo data" description="Restore the seeded course, learner and leaderboard">
-          <Button variant="danger" disabled={devBusy} onClick={() => setConfirmReset(true)}>
-            Reset
-          </Button>
-        </Row>
-      </section>
+      {devClock.data && (
+        <section className="card border-dashed px-5 py-2">
+          <h2 className="pt-3 text-lg font-extrabold">Demo tools</h2>
+          <p className="text-sm text-muted">Simulate time passing to test streaks, daily goals and heart regeneration.</p>
+          <Row title="Today is" description={todayLabel}>
+            <Button
+              variant="outline"
+              disabled={devBusy}
+              onClick={() => void runDevAction(() => api.advanceDay(1), () => "Moved to the next day")}
+            >
+              Next day
+            </Button>
+          </Row>
+          <Row title="Reset demo data" description="Restore the seeded course, learner and leaderboard">
+            <Button variant="danger" disabled={devBusy} onClick={() => setConfirmReset(true)}>
+              Reset
+            </Button>
+          </Row>
+        </section>
+      )}
 
       <Modal open={confirmReset} onClose={() => setConfirmReset(false)} labelledBy="reset-title">
         <h2 id="reset-title" className="text-center text-2xl font-extrabold">

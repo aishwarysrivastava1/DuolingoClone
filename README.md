@@ -141,10 +141,10 @@ and re-seeds). Leave both variables empty to fall back to the local SQLite file.
 | `TURSO_DATABASE_URL` | backend | unset | Turso database URL; when set it replaces the local SQLite file |
 | `TURSO_AUTH_TOKEN` | backend | unset | Turso database auth token |
 | `DATABASE_PATH` | backend | `backend/data/duolingo.db` | Local SQLite file, used when Turso isn't configured |
-| `CORS_ORIGINS` | backend | `http://localhost:3000,http://127.0.0.1:3000` | Allowed frontend origins (comma-separated) |
-| `CORS_ORIGIN_REGEX` | backend | unset | Extra origin pattern, e.g. `https://.*\.vercel\.app` |
-| `HEART_REGEN_MINUTES` | backend | `30` | Minutes to regenerate one heart |
-| `ENABLE_DEV_ROUTES` | backend | `true` | Expose `/api/dev/*` (simulate day, reset) |
+| `CORS_ORIGINS` | backend | `http://localhost:3000,http://127.0.0.1:3000` | Allowed frontend origins (comma-separated, no trailing slash needed) |
+| `CORS_ORIGIN_REGEX` | backend | unset | Extra origin pattern for preview deployments, e.g. `https://duolingo-clone-[a-z0-9-]+-<team>\.vercel\.app` (avoid `https://.*\.vercel\.app`, which matches every Vercel site) |
+| `HEART_REGEN_MINUTES` | backend | `30` | Minutes to regenerate one heart (a whole number ≥ 1; anything else stops startup) |
+| `ENABLE_DEV_ROUTES` | backend | `true` | Expose `/api/dev/*` (simulate day, reset). When `false`, Settings hides the demo tools |
 
 ## Architecture
 
@@ -398,7 +398,7 @@ Codes: `skill_locked` (403), `out_of_hearts`, `skill_legendary`, `nothing_to_pra
 ## Testing
 
 ```bash
-# backend — 59 tests: pure rules + full API flows on a temporary SQLite database
+# backend — 71 tests: pure rules + full API flows on a temporary SQLite database
 cd backend && pytest
 
 # the same suite against a libSQL server, e.g. a throwaway Turso database or `turso dev`
@@ -412,7 +412,9 @@ cd frontend && npm run typecheck && npm run lint && npm run build
 The API tests cover the lesson loop end to end: hidden answer keys, perfect-lesson bonus,
 heart loss and re-queued mistakes, running out of hearts and resuming after a refill, practice
 restoring hearts, crowns and unlocking, double-complete protection, streaks across simulated
-days, daily goal, achievements, leaderboard, settings validation, reset and CORS.
+days, daily goal, achievements, leaderboard, settings validation, reset and CORS. Hardening tests
+cover malformed `X-Timezone` headers, JSON 500 responses that keep CORS headers, streaks when
+the learner's timezone moves west, and invalid configuration values.
 
 The UI was additionally verified with scripted browser runs (Playwright) covering a full lesson
 with a mistake, out-of-hearts → refill → resume, quitting, practice, popovers, mobile and dark
@@ -420,15 +422,18 @@ mode, persistence after reload, and slow / failing network requests.
 
 ## Deployment
 
-**Backend → Render.** [`render.yaml`](render.yaml) is a ready blueprint (root `backend/`,
-`uvicorn app.main:app`). Set `CORS_ORIGINS` to the frontend URL, and `TURSO_DATABASE_URL` /
+**Backend → Render.** [`render.yaml`](render.yaml) is a ready blueprint (free plan, root `backend/`,
+`uvicorn app.main:app`, health check on `/health`). Set `CORS_ORIGINS` to the frontend URL, and `TURSO_DATABASE_URL` /
 `TURSO_AUTH_TOKEN` so progress lives in Turso and survives restarts and deploys. Without them the
 service falls back to a local SQLite file, which Render's free tier wipes on every restart. Tables
 are created on startup; running `python scripts/init_db.py` locally with the same values first
 lets you confirm the connection. Any host that runs a Python web process works the same way.
 
 **Frontend → Vercel.** Import the repo, set **Root Directory** to `frontend`, and add
-`NEXT_PUBLIC_API_URL=https://<your-backend>`.
+`NEXT_PUBLIC_API_URL=https://<your-backend>`. The value is baked in at build time, so redeploy
+after changing it. Pages are served with clickjacking, MIME-sniffing, referrer and permissions
+headers (`next.config.ts`). While the free backend wakes up, loading screens say so after a few
+seconds, and a missing or `http://` API URL is reported in the UI instead of a generic network error.
 
 **Keeping the backend awake.** Render's free tier spins services down after 15 idle minutes. A
 GitHub Actions workflow ([`keep-alive.yml`](.github/workflows/keep-alive.yml)) pings `/health` every
@@ -448,3 +453,8 @@ GitHub Actions workflow ([`keep-alive.yml`](.github/workflows/keep-alive.yml)) p
 - **Dark mode** is stored per device (`localStorage`); other settings are stored per learner.
 - All illustrations (owl mascot, icons) are original SVGs; the Nunito font approximates Duolingo's
   proprietary typeface.
+- **Demo routes are on by default** so reviewers can simulate days. They let anyone with the URL
+  reset the data; set `ENABLE_DEV_ROUTES=false` on a public deployment you want to keep.
+- `npm audit` reports no issues in production dependencies (PostCSS is pinned to a patched version
+  through `overrides`). A `braces` advisory remains in the dev-only lint toolchain, which has no
+  patched release yet; it never ships to the browser.

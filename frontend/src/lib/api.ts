@@ -33,6 +33,28 @@ export function toApiError(error: unknown): ApiError {
   return new ApiError(0, "unknown_error", "Something went wrong. Please try again.");
 }
 
+function isLocalHost(hostname: string): boolean {
+  return hostname === "localhost" || hostname === "127.0.0.1";
+}
+
+/** Explain a failed fetch, calling out the two common deployment mistakes. */
+function unreachableMessage(): string {
+  if (typeof window !== "undefined") {
+    try {
+      const api = new URL(API_URL);
+      if (isLocalHost(api.hostname) && !isLocalHost(window.location.hostname)) {
+        return "This site isn't connected to its API: set NEXT_PUBLIC_API_URL to the backend URL and redeploy.";
+      }
+      if (api.protocol === "http:" && window.location.protocol === "https:" && !isLocalHost(api.hostname)) {
+        return "The API URL must use https:// when the site is served over https. Update NEXT_PUBLIC_API_URL and redeploy.";
+      }
+    } catch {
+      return "NEXT_PUBLIC_API_URL is not a valid URL. Fix it and redeploy.";
+    }
+  }
+  return "Can't reach the server. Check your connection and try again.";
+}
+
 function browserTimezone(): string | null {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -52,7 +74,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   try {
     response = await fetch(`${API_URL}${path}`, { ...init, headers, cache: "no-store" });
   } catch {
-    throw new ApiError(0, "network_error", "Can't reach the server. Check your connection and try again.");
+    throw new ApiError(0, "network_error", unreachableMessage());
   }
 
   if (response.status === 204) return undefined as T;
