@@ -1,0 +1,19 @@
+# Render blueprint for the FastAPI backend (https://render.com/docs/blueprint-spec).
+# The frontend deploys to Vercel with Root Directory = frontend (see README).
+services:
+  - type: web
+    name: duolingo-clone-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      # Comma-separated list of exact frontend origins, e.g. https://my-app.vercel.app
+      - key: CORS_ORIGINS
+        sync: false
+      # Also allow Vercel preview deployments.
+      - key: CORS_ORIGIN_REGEX
+        value: https://.*\.vercel\.app

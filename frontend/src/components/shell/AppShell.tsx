@@ -1,0 +1,46 @@
+"use client";
+
+import { ErrorState, LoadingScreen } from "@/components/ui/StatusScreens";
+import { DailyQuestsCard, LeagueCard, SuperCard } from "@/components/widgets/SidebarCards";
+import { useUser } from "@/context/UserContext";
+import { MobileNav } from "./MobileNav";
+import { Sidebar } from "./Sidebar";
+import { StatsBar } from "./StatsBar";
+
+/**
+ * Three-column Duolingo layout: navigation sidebar, main column and a right
+ * rail with stats + widgets. Below `xl` the stats move to a sticky top bar and
+ * below `md` navigation moves to a bottom tab bar.
+ */
+export function AppShell({ children }: { children: React.ReactNode }) {
+  const { me, error, refresh } = useUser();
+
+  if (!me) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center">
+        {error ? <ErrorState message={error.message} onRetry={() => void refresh()} /> : <LoadingScreen />}
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-dvh">
+      <Sidebar />
+      <div className="md:pl-[88px] lg:pl-[256px]">
+        <header className="sticky top-0 z-20 border-b-2 border-line bg-bg px-2 py-2 sm:px-6 xl:hidden">
+          <StatsBar className="mx-auto max-w-[600px]" />
+        </header>
+        <div className="mx-auto flex w-full max-w-[1080px] justify-center gap-12 px-4 pb-28 sm:px-6 md:pb-12 xl:px-8">
+          <main className="w-full max-w-[600px] min-w-0 pt-6">{children}</main>
+          <aside className="sticky top-0 hidden w-[368px] shrink-0 flex-col gap-6 self-start py-6 xl:flex">
+            <StatsBar />
+            <SuperCard />
+            <LeagueCard />
+            <DailyQuestsCard />
+          </aside>
+        </div>
+      </div>
+      <MobileNav />
+    </div>
+  );
+}
