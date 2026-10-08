@@ -83,29 +83,34 @@ RIVALS = (
 
 
 def _insert_course(conn: sqlite3.Connection, course: CourseContent) -> int:
-    course_id = conn.execute(
-        "INSERT INTO courses (code, title, learning_language, from_language) VALUES (?, ?, ?, ?)",
-        (course.code, course.title, course.learning_language, course.from_language),
-    ).lastrowid
+    """Write the course tree with one bulk insert per table.
+
+    Ids are assigned here rather than read back with ``lastrowid`` so the ~1,200
+    content rows take a handful of statements instead of one network round trip
+    each on Turso. The tables were just emptied, so ids 1..n are exactly what
+    SQLite would have assigned.
+    """
+    course_id = 1
+    units: list[tuple] = []
+    skills: list[tuple] = []
+    lessons: list[tuple] = []
+    exercises: list[tuple] = []
+    options: list[tuple] = []
+    answers: list[tuple] = []
     for unit_position, unit in enumerate(course.units, start=1):
-        unit_id = conn.execute(
-            "INSERT INTO units (course_id, position, title, description, theme) VALUES (?, ?, ?, ?, ?)",
-            (course_id, unit_position, unit.title, unit.description, unit.theme),
-        ).lastrowid
+        unit_id = len(units) + 1
+        units.append((unit_id, course_id, unit_position, unit.title, unit.description, unit.theme))
         for skill_position, skill in enumerate(unit.skills, start=1):
-            skill_id = conn.execute(
-                "INSERT INTO skills (unit_id, position, title, icon) VALUES (?, ?, ?, ?)",
-                (unit_id, skill_position, skill.title, skill.icon),
-            ).lastrowid
-            for lesson_position, exercises in enumerate(build_lessons(skill), start=1):
-                lesson_id = conn.execute(
-                    "INSERT INTO lessons (skill_id, position) VALUES (?, ?)", (skill_id, lesson_position)
-                ).lastrowid
-                for exercise_position, spec in enumerate(exercises, start=1):
-                    exercise_id = conn.execute(
-                        "INSERT INTO exercises (lesson_id, position, type, prompt, source_text, translation, audio_text) "
-                        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            skill_id = len(skills) + 1
+            skills.append((skill_id, unit_id, skill_position, skill.title, skill.icon))
+            for lesson_position, specs in enumerate(build_lessons(skill), start=1):
+                lesson_id = len(lessons) + 1
+                lessons.append((lesson_id, skill_id, lesson_position))
+                for exercise_position, spec in enumerate(specs, start=1):
+                    exercise_id = len(exercises) + 1
+                    exercises.append(
                         (
+                            exercise_id,
                             lesson_id,
                             exercise_position,
                             spec.type,
@@ -113,20 +118,45 @@ def _insert_course(conn: sqlite3.Connection, course: CourseContent) -> int:
                             spec.source_text,
                             spec.translation,
                             spec.audio_text,
-                        ),
-                    ).lastrowid
-                    conn.executemany(
-                        "INSERT INTO exercise_options (exercise_id, position, text, match_text, image, is_correct) "
-                        "VALUES (?, ?, ?, ?, ?, ?)",
-                        [
-                            (exercise_id, position, o.text, o.match_text, o.image, int(o.is_correct))
-                            for position, o in enumerate(spec.options, start=1)
-                        ],
+                        )
                     )
-                    conn.executemany(
-                        "INSERT INTO exercise_answers (exercise_id, text, is_primary) VALUES (?, ?, ?)",
-                        [(exercise_id, text, int(index == 0)) for index, text in enumerate(spec.answers)],
-                    )
+                    for position, option in enumerate(spec.options, start=1):
+                        options.append(
+                            (
+                                len(options) + 1,
+                                exercise_id,
+                                position,
+                                option.text,
+                                option.match_text,
+                                option.image,
+                                int(option.is_correct),
+                            )
+                        )
+                    for index, text in enumerate(spec.answers):
+                        answers.append((len(answers) + 1, exercise_id, text, int(index == 0)))
+
+    conn.execute(
+        "INSERT INTO courses (id, code, title, learning_language, from_language) VALUES (?, ?, ?, ?, ?)",
+        (course_id, course.code, course.title, course.learning_language, course.from_language),
+    )
+    conn.executemany(
+        "INSERT INTO units (id, course_id, position, title, description, theme) VALUES (?, ?, ?, ?, ?, ?)", units
+    )
+    conn.executemany("INSERT INTO skills (id, unit_id, position, title, icon) VALUES (?, ?, ?, ?, ?)", skills)
+    conn.executemany("INSERT INTO lessons (id, skill_id, position) VALUES (?, ?, ?)", lessons)
+    conn.executemany(
+        "INSERT INTO exercises (id, lesson_id, position, type, prompt, source_text, translation, audio_text) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        exercises,
+    )
+    conn.executemany(
+        "INSERT INTO exercise_options (id, exercise_id, position, text, match_text, image, is_correct) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        options,
+    )
+    conn.executemany(
+        "INSERT INTO exercise_answers (id, exercise_id, text, is_primary) VALUES (?, ?, ?, ?)", answers
+    )
     return course_id
 
 

@@ -3,7 +3,7 @@
 import argparse
 
 from app.config import load_settings
-from app.database import connect, init_schema
+from app.database import connect, describe_database, init_schema
 from app.seed.seeder import seed_database
 
 
@@ -13,8 +13,7 @@ def main() -> None:
     args = parser.parse_args()
 
     settings = load_settings()
-    settings.database_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = connect(settings.database_path)
+    conn = connect(settings)
     try:
         init_schema(conn)
         seed_database(conn, args.timezone)
@@ -24,7 +23,7 @@ def main() -> None:
         }
     finally:
         conn.close()
-    print(f"Seeded {settings.database_path}: " + ", ".join(f"{n} {t}" for t, n in counts.items()))
+    print(f"Seeded {describe_database(settings)}: " + ", ".join(f"{n} {t}" for t, n in counts.items()))
 
 
 if __name__ == "__main__":

@@ -1,3 +1,4 @@
+import os
 import sqlite3
 from collections.abc import Iterator
 
@@ -7,23 +8,38 @@ from fastapi.testclient import TestClient
 from app.config import Settings
 from app.database import connect
 from app.main import create_app
+from app.seed import seed_database
 from app.seed.lessons import tokenize
 
 
 @pytest.fixture
 def settings(tmp_path) -> Settings:
-    return Settings(database_path=tmp_path / "test.db", cors_origins=["http://localhost:3000"])
+    # By default every test gets a fresh SQLite file. Set TEST_TURSO_DATABASE_URL
+    # (and TEST_TURSO_AUTH_TOKEN) to run the suite against a libSQL/Turso database
+    # instead — it is wiped and re-seeded for every test, so never use one whose data
+    # you need. The variables are separate from TURSO_* on purpose.
+    return Settings(
+        database_path=tmp_path / "test.db",
+        turso_database_url=os.getenv("TEST_TURSO_DATABASE_URL") or None,
+        turso_auth_token=os.getenv("TEST_TURSO_AUTH_TOKEN") or None,
+        cors_origins=["http://localhost:3000"],
+    )
 
 
 @pytest.fixture
 def client(settings: Settings) -> Iterator[TestClient]:
     with TestClient(create_app(settings)) as test_client:
+        if settings.uses_turso:
+            # A remote database keeps its data between tests: start each one from the seed.
+            conn = connect(settings)
+            seed_database(conn)
+            conn.close()
         yield test_client
 
 
 @pytest.fixture
 def db(client: TestClient, settings: Settings) -> Iterator[sqlite3.Connection]:
-    conn = connect(settings.database_path)
+    conn = connect(settings)
     yield conn
     conn.close()
 

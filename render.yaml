@@ -17,3 +17,9 @@ services:
       # Also allow Vercel preview deployments.
       - key: CORS_ORIGIN_REGEX
         value: https://.*\.vercel\.app
+      # Turso database (see README "Database: Turso"). Without these the service
+      # falls back to a local SQLite file, which Render wipes on every restart.
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false

@@ -1,8 +1,8 @@
 # Keeping the backend awake on Render
 
 Render's free web services **spin down after 15 minutes without inbound traffic**, and the next
-visitor waits up to about a minute for a cold start. A spin-down also wipes the free instance's
-filesystem, which for this app means the SQLite database (learner progress) is re-seeded.
+visitor waits up to about a minute for a cold start. (A spin-down also wipes the instance's disk;
+learner progress is safe as long as the backend uses Turso — see the README's *Database: Turso*.)
 
 Two independent pingers keep the service warm by calling a lightweight health endpoint:
 
@@ -77,6 +77,6 @@ One backup is enough; running both does no harm.
 - **Instance hours:** each Render workspace gets **750 free instance hours per month**, and an
   always-on service uses about 720–744. Keep only **one** free service awake this way, or Render
   suspends all free services once the hours run out.
-- **Data persistence:** keep-alive prevents wipes caused by spin-downs, but redeploys and restarts
-  still reset the free instance's filesystem. For durable progress, attach a persistent disk (paid)
-  and set `DATABASE_PATH`, as described in the README.
+- **Data persistence:** keep-alive only avoids cold starts. Durable progress comes from storing data
+  in Turso (`TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN`); without it the local SQLite fallback is wiped
+  on every spin-down, restart and deploy.
