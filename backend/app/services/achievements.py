@@ -1,9 +1,9 @@
 """Achievements: thresholds on learner metrics, unlocked after each session."""
 
-import sqlite3
 from datetime import datetime
 
 from app import schemas
+from app.database import Connection
 from app.services.path import CoursePath
 
 _PERFECT_LESSONS_QUERY = """
@@ -15,7 +15,7 @@ WHERE s.user_id = ? AND s.mode = 'lesson' AND s.status = 'completed'
 """
 
 
-def compute_metrics(conn: sqlite3.Connection, user_id: int, path: CoursePath) -> dict[str, int]:
+def compute_metrics(conn: Connection, user_id: int, path: CoursePath) -> dict[str, int]:
     user = conn.execute(
         "SELECT total_xp, longest_streak FROM users WHERE id = ?", (user_id,)
     ).fetchone()
@@ -33,7 +33,7 @@ def compute_metrics(conn: sqlite3.Connection, user_id: int, path: CoursePath) ->
 
 
 def unlock_earned(
-    conn: sqlite3.Connection, user_id: int, metrics: dict[str, int], now: datetime
+    conn: Connection, user_id: int, metrics: dict[str, int], now: datetime
 ) -> list[schemas.UnlockedAchievementOut]:
     """Persist every achievement whose threshold is now met; return the new ones."""
     pending = conn.execute(
@@ -61,7 +61,7 @@ def unlock_earned(
 
 
 def list_achievements(
-    conn: sqlite3.Connection, user_id: int, metrics: dict[str, int]
+    conn: Connection, user_id: int, metrics: dict[str, int]
 ) -> list[schemas.AchievementOut]:
     rows = conn.execute(
         """

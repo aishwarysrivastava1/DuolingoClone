@@ -1,11 +1,32 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { Mascot } from "@/components/Mascot";
 import { Button } from "./Button";
 
-export function LoadingScreen({ label = "Loading..." }: { label?: string }) {
+interface LoadingScreenProps {
+  label?: string;
+  /** After this long, explain that the (free-tier) server may be waking up. */
+  slowHintAfterMs?: number;
+}
+
+export function LoadingScreen({ label = "Loading...", slowHintAfterMs }: LoadingScreenProps) {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (!slowHintAfterMs) return;
+    const timer = window.setTimeout(() => setSlow(true), slowHintAfterMs);
+    return () => window.clearTimeout(timer);
+  }, [slowHintAfterMs]);
+
   return (
     <div className="flex flex-col items-center justify-center gap-4 py-24" role="status">
       <Mascot className="animate-bob w-24" />
       <p className="text-sm font-extrabold tracking-[0.2em] text-faint uppercase">{label}</p>
+      {slow && (
+        <p className="animate-fade-in max-w-xs px-6 text-center text-sm text-muted">
+          Waking up the server… It sleeps when nobody is using it, so the first visit can take up to a minute.
+        </p>
+      )}
     </div>
   );
 }

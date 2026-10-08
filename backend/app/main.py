@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import Settings, load_settings
 from app.database import connect, describe_database, init_schema, is_seeded
-from app.errors import register_error_handlers
+from app.errors import UnhandledErrorMiddleware, register_error_handlers
 from app.routers import course, dev, health, leaderboard, me, sessions
 from app.seed import seed_database
 
@@ -49,6 +49,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     app.state.settings = settings
+    # Order matters: middleware added later wraps earlier ones, so CORS headers
+    # also reach the JSON 500s produced by UnhandledErrorMiddleware.
+    app.add_middleware(UnhandledErrorMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,

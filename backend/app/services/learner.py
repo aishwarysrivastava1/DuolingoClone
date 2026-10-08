@@ -1,24 +1,24 @@
 """Learner state: stats read-model, hearts persistence, settings and refills."""
 
-import sqlite3
 from datetime import date, datetime, timedelta
 
 from app import schemas
 from app.clock import Clock
+from app.database import Connection, Row
 from app.errors import AppError
 from app.rules import HEART_REFILL_COST_GEMS, MAX_HEARTS
 from app.services import hearts as heart_rules
-from app.services.streaks import visible_streak
+from app.services.streaks import active_today, visible_streak
 
 
-def get_user(conn: sqlite3.Connection, user_id: int) -> sqlite3.Row:
+def get_user(conn: Connection, user_id: int) -> Row:
     row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     if row is None:
         raise AppError(404, "user_not_found", "Learner not found.")
     return row
 
 
-def find_user_id(conn: sqlite3.Connection, username: str) -> int:
+def find_user_id(conn: Connection, username: str) -> int:
     row = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
     if row is None:
         raise AppError(503, "not_seeded", "The default learner does not exist. Seed the database first.")
@@ -32,16 +32,16 @@ def parse_date(value: str | None) -> date | None:
 # --- Hearts ------------------------------------------------------------------
 
 
-def stored_hearts(user: sqlite3.Row) -> heart_rules.Hearts:
+def stored_hearts(user: Row) -> heart_rules.Hearts:
     anchor = user["hearts_refill_from"]
     return heart_rules.Hearts(user["hearts"], datetime.fromisoformat(anchor) if anchor else None)
 
 
-def current_hearts(user: sqlite3.Row, now: datetime, interval: timedelta) -> heart_rules.Hearts:
+def current_hearts(user: Row, now: datetime, interval: timedelta) -> heart_rules.Hearts:
     return heart_rules.regenerate(stored_hearts(user), now, interval)
 
 
-def save_hearts(conn: sqlite3.Connection, user_id: int, hearts: heart_rules.Hearts) -> None:
+def save_hearts(conn: Connection, user_id: int, hearts: heart_rules.Hearts) -> None:
     conn.execute(
         "UPDATE users SET hearts = ?, hearts_refill_from = ? WHERE id = ?",
         (hearts.count, hearts.refill_from.isoformat() if hearts.refill_from else None, user_id),
@@ -58,7 +58,7 @@ def hearts_out(hearts: heart_rules.Hearts, interval: timedelta) -> schemas.Heart
     )
 
 
-def refill_hearts(conn: sqlite3.Connection, user_id: int, clock: Clock, interval: timedelta) -> None:
+def refill_hearts(conn: Connection, user_id: int, clock: Clock, interval: timedelta) -> None:
     user = get_user(conn, user_id)
     hearts = current_hearts(user, clock.now, interval)
     if hearts.is_full:
@@ -72,7 +72,7 @@ def refill_hearts(conn: sqlite3.Connection, user_id: int, clock: Clock, interval
 # --- Streak & daily goal -------------------------------------------------------
 
 
-def xp_on(conn: sqlite3.Connection, user_id: int, day: date) -> int:
+def xp_on(conn: Connection, user_id: int, day: date) -> int:
     row = conn.execute(
         "SELECT xp_earned FROM daily_activity WHERE user_id = ? AND activity_date = ?",
         (user_id, day.isoformat()),
@@ -80,7 +80,7 @@ def xp_on(conn: sqlite3.Connection, user_id: int, day: date) -> int:
     return row["xp_earned"] if row else 0
 
 
-def streak_week(conn: sqlite3.Connection, user_id: int, today: date) -> list[schemas.StreakDayOut]:
+def streak_week(conn: Connection, user_id: int, today: date) -> list[schemas.StreakDayOut]:
     """Monday → Sunday of the current week, flagging days with XP."""
     monday = today - timedelta(days=today.weekday())
     sunday = monday + timedelta(days=6)
@@ -99,12 +99,12 @@ def streak_week(conn: sqlite3.Connection, user_id: int, today: date) -> list[sch
 # --- Read model ----------------------------------------------------------------
 
 
-def course_out(conn: sqlite3.Connection, course_id: int) -> schemas.CourseOut:
+def course_out(conn: Connection, course_id: int) -> schemas.CourseOut:
     row = conn.execute("SELECT * FROM courses WHERE id = ?", (course_id,)).fetchone()
     return schemas.CourseOut(**dict(row))
 
 
-def build_me(conn: sqlite3.Connection, user_id: int, clock: Clock, interval: timedelta) -> schemas.MeOut:
+def build_me(conn: Connection, user_id: int, clock: Clock, interval: timedelta) -> schemas.MeOut:
     user = get_user(conn, user_id)
     last_active_on = parse_date(user["last_active_on"])
     today_xp = xp_on(conn, user_id, clock.today)
@@ -123,7 +123,7 @@ def build_me(conn: sqlite3.Connection, user_id: int, clock: Clock, interval: tim
         streak=schemas.StreakOut(
             count=visible_streak(user["current_streak"], last_active_on, clock.today),
             longest=user["longest_streak"],
-            active_today=last_active_on == clock.today,
+            active_today=active_today(last_active_on, clock.today),
             week=streak_week(conn, user_id, clock.today),
         ),
         daily_goal=schemas.DailyGoalOut(
@@ -137,7 +137,7 @@ def build_me(conn: sqlite3.Connection, user_id: int, clock: Clock, interval: tim
     )
 
 
-def update_settings(conn: sqlite3.Connection, user_id: int, update: schemas.SettingsUpdate) -> None:
+def update_settings(conn: Connection, user_id: int, update: schemas.SettingsUpdate) -> None:
     display_name = update.display_name.strip() if update.display_name is not None else None
     if display_name == "":
         raise AppError(422, "invalid_display_name", "Your name can't be blank.")

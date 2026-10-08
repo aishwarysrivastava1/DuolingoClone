@@ -18,7 +18,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (!me) {
     return (
       <div className="flex min-h-dvh items-center justify-center">
-        {error ? <ErrorState message={error.message} onRetry={() => void refresh()} /> : <LoadingScreen />}
+        {error ? (
+          <ErrorState message={error.message} onRetry={() => void refresh()} />
+        ) : (
+          <LoadingScreen slowHintAfterMs={4000} />
+        )}
       </div>
     );
   }

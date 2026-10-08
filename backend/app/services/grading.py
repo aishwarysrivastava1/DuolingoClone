@@ -8,9 +8,9 @@ accepted with a gentle note, the way Duolingo flags typos.
 import re
 import unicodedata
 from dataclasses import dataclass
-from sqlite3 import Row
 
 from app import schemas
+from app.database import Row
 
 _PUNCTUATION = re.compile(r"[.,!?¿¡;:\"“”«»()\-]")
 _APOSTROPHES = re.compile(r"['’`]")
@@ -73,10 +73,10 @@ def grade(exercise: Row, options: list[Row], answers: list[Row], answer: schemas
     if isinstance(answer, schemas.TypeAnswer):
         submitted = answer.text.strip()
         typed = normalize(submitted)
-        accepted = [normalize(a["text"]) for a in answers]
-        if typed in accepted:
+        accepted_texts = [normalize(a["text"]) for a in answers]
+        if typed in accepted_texts:
             return Grade(True, solution, submitted)
-        if typed and strip_accents(typed) in {strip_accents(a) for a in accepted}:
+        if typed and strip_accents(typed) in {strip_accents(text) for text in accepted_texts}:
             return Grade(True, solution, submitted, note="Pay attention to the accents.")
         return Grade(False, solution, submitted)
 

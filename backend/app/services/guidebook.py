@@ -1,8 +1,8 @@
 """Unit guidebook: key words and phrases taught in a unit."""
 
-import sqlite3
 
 from app import schemas
+from app.database import Connection
 from app.errors import AppError
 
 _WORDS_QUERY = """
@@ -29,7 +29,7 @@ ORDER BY MIN(s.position), MIN(l.position)
 """
 
 
-def get_guidebook(conn: sqlite3.Connection, user_id: int, unit_id: int) -> schemas.GuidebookOut:
+def get_guidebook(conn: Connection, user_id: int, unit_id: int) -> schemas.GuidebookOut:
     unit = conn.execute(
         "SELECT un.* FROM units un JOIN users u ON u.course_id = un.course_id WHERE un.id = ? AND u.id = ?",
         (unit_id, user_id),

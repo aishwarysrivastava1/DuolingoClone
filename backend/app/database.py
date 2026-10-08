@@ -17,6 +17,7 @@ Connections run in autocommit mode and every write path opts into an explicit
 ``transaction()``; ``BEGIN IMMEDIATE`` takes the write lock up front.
 """
 
+import logging
 import re
 import sqlite3
 import threading
@@ -28,6 +29,7 @@ from typing import Any
 from app.config import Settings
 
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
+logger = logging.getLogger(__name__)
 
 
 # --- Local SQLite --------------------------------------------------------------
@@ -74,7 +76,7 @@ def _bind(sql: str, params: Sequence[Any] | Mapping[str, Any]) -> tuple[str, tup
     return _SQL_TOKENS.sub(to_positional, sql), tuple(values)
 
 
-class Row:
+class LibsqlRow:
     """``sqlite3.Row`` look-alike: index by position or (case-insensitive) column name."""
 
     __slots__ = ("_names", "_index", "_values")
@@ -99,11 +101,11 @@ class Row:
         return len(self._values)
 
     def __repr__(self) -> str:
-        return f"Row({dict(zip(self._names, self._values))!r})"
+        return f"LibsqlRow({dict(zip(self._names, self._values, strict=True))!r})"
 
 
 class Cursor:
-    """Wraps a libSQL cursor so results come back as ``Row`` objects."""
+    """Wraps a libSQL cursor so results come back as ``LibsqlRow`` objects."""
 
     def __init__(self, raw: Any):
         self._raw = raw
@@ -117,23 +119,23 @@ class Cursor:
     def rowcount(self) -> int:
         return self._raw.rowcount
 
-    def _row(self, values: Sequence[Any]) -> Row:
+    def _row(self, values: Sequence[Any]) -> LibsqlRow:
         if self._columns is None:
             names = tuple(column[0] for column in self._raw.description or ())
             index: dict[str, int] = {}
             for position, name in enumerate(names):
                 index.setdefault(name.lower(), position)  # first match wins, as in sqlite3
             self._columns = (names, index)
-        return Row(*self._columns, values)
+        return LibsqlRow(*self._columns, values)
 
-    def fetchone(self) -> Row | None:
+    def fetchone(self) -> LibsqlRow | None:
         values = self._raw.fetchone()
         return None if values is None else self._row(values)
 
-    def fetchall(self) -> list[Row]:
+    def fetchall(self) -> list[LibsqlRow]:
         return [self._row(values) for values in self._raw.fetchall()]
 
-    def __iter__(self) -> Iterator[Row]:
+    def __iter__(self) -> Iterator[LibsqlRow]:
         return iter(self.fetchall())
 
 
@@ -182,10 +184,11 @@ def _connect_turso(url: str, auth_token: str | None) -> LibsqlConnection:
 # --- Public API ----------------------------------------------------------------
 
 Connection = sqlite3.Connection | LibsqlConnection
+Row = sqlite3.Row | LibsqlRow
 
 
 def connect(settings: Settings) -> Connection:
-    if settings.uses_turso:
+    if settings.turso_database_url:
         return _connect_turso(settings.turso_database_url, settings.turso_auth_token)
     return _connect_sqlite(settings.database_path)
 
@@ -220,7 +223,7 @@ def _rollback_quietly(conn: Connection) -> None:
     try:
         conn.execute("ROLLBACK")
     except Exception:
-        pass
+        logger.warning("ROLLBACK failed; the database had already ended the transaction", exc_info=True)
 
 
 def init_schema(conn: Connection) -> None:

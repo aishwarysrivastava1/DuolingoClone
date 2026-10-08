@@ -51,7 +51,7 @@ export function LessonPlayer({ mode, skillId }: { mode: SessionMode; skillId: nu
   if (state.phase === "loading") {
     return (
       <Centered>
-        <LoadingScreen label={mode === "practice" ? "Loading practice..." : "Loading lesson..."} />
+        <LoadingScreen label={mode === "practice" ? "Loading practice..." : "Loading lesson..."} slowHintAfterMs={4000} />
       </Centered>
     );
   }

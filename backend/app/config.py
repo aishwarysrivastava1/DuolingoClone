@@ -13,6 +13,25 @@ def _split_csv(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+def _origins(value: str) -> list[str]:
+    # Browsers send Origin without a trailing slash; CORS matching is exact, so a
+    # pasted "https://app.vercel.app/" would otherwise silently block every call.
+    return [origin.rstrip("/") for origin in _split_csv(value)]
+
+
+def _positive_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        raise ValueError(f"{name} must be a whole number, got {raw!r}") from None
+    if value < 1:
+        raise ValueError(f"{name} must be at least 1, got {value}")
+    return value
+
+
 @dataclass(frozen=True)
 class Settings:
     # Local SQLite file, used whenever Turso isn't configured (e.g. local development).
@@ -28,6 +47,10 @@ class Settings:
     default_username: str = "learner"
     enable_dev_routes: bool = True
 
+    def __post_init__(self) -> None:
+        if self.heart_regen_minutes < 1:
+            raise ValueError("heart_regen_minutes must be at least 1")
+
     @property
     def uses_turso(self) -> bool:
         return bool(self.turso_database_url)
@@ -41,9 +64,9 @@ def load_settings() -> Settings:
         database_path=Path(os.getenv("DATABASE_PATH", str(defaults.database_path))),
         turso_database_url=os.getenv("TURSO_DATABASE_URL", "").strip() or None,
         turso_auth_token=os.getenv("TURSO_AUTH_TOKEN", "").strip() or None,
-        cors_origins=_split_csv(os.getenv("CORS_ORIGINS", ",".join(defaults.cors_origins))),
-        cors_origin_regex=os.getenv("CORS_ORIGIN_REGEX") or None,
-        heart_regen_minutes=int(os.getenv("HEART_REGEN_MINUTES", defaults.heart_regen_minutes)),
+        cors_origins=_origins(os.getenv("CORS_ORIGINS", ",".join(defaults.cors_origins))),
+        cors_origin_regex=os.getenv("CORS_ORIGIN_REGEX", "").strip() or None,
+        heart_regen_minutes=_positive_int("HEART_REGEN_MINUTES", defaults.heart_regen_minutes),
         default_username=os.getenv("DEFAULT_USERNAME", defaults.default_username),
         enable_dev_routes=os.getenv("ENABLE_DEV_ROUTES", "true").lower() in {"1", "true", "yes"},
     )
