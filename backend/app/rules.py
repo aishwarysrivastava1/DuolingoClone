@@ -1,0 +1,11 @@
+"""Game-balance constants shared by the services."""
+
+MAX_HEARTS = 5
+HEART_REFILL_COST_GEMS = 350
+
+PERFECT_LESSON_BONUS_XP = 5
+PRACTICE_XP = 5
+PRACTICE_SESSION_SIZE = 8
+
+MAX_CROWN_LEVEL = 5
+DAILY_GOAL_OPTIONS = (10, 20, 30, 50)
