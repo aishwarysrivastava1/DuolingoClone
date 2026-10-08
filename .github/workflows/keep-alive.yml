@@ -1,0 +1,73 @@
+# Keeps the FastAPI backend on Render's free tier awake by pinging its health
+# endpoint; Render spins free services down after 15 minutes without traffic.
+# Setup and the external backup monitor are described in docs/keep-alive.md.
+name: Keep backend awake
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: # run it by hand from the Actions tab to test the setup
+
+permissions: {} # the job only makes an outbound HTTP request
+
+concurrency:
+  group: keep-alive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      # Configure as a repository secret or a repository variable.
+      BACKEND_HEALTH_URL: ${{ secrets.BACKEND_HEALTH_URL || vars.BACKEND_HEALTH_URL }}
+    steps:
+      - name: Ping health endpoint
+        id: ping
+        continue-on-error: true
+        run: |
+          if [ -z "$BACKEND_HEALTH_URL" ]; then
+            echo "result=unconfigured" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # A spun-down Render service can take up to a minute to wake up, so
+          # allow a generous timeout and retry before calling it a failure.
+          status=$(curl --silent --show-error --location \
+            --max-time 60 --retry 2 --retry-delay 10 --retry-all-errors \
+            --output response.txt --write-out '%{http_code}' \
+            "$BACKEND_HEALTH_URL") || status="000"
+
+          echo "HTTP status: $status"
+          echo "Response body: $(head -c 200 response.txt 2>/dev/null)"
+          echo "http_status=$status" >> "$GITHUB_OUTPUT"
+          if [ "$status" -ge 200 ] && [ "$status" -lt 300 ]; then
+            echo "result=success" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=failure" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Fallback: always runs, logs the outcome and fails the run if the
+      # backend did not answer, so problems show up as red runs in the Actions tab.
+      - name: Report result
+        if: always()
+        env:
+          RESULT: ${{ steps.ping.outputs.result }}
+          HTTP_STATUS: ${{ steps.ping.outputs.http_status }}
+        run: |
+          checked_at=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          case "$RESULT" in
+            success)
+              echo "::notice title=Backend awake::Health check returned HTTP $HTTP_STATUS at $checked_at"
+              echo "✅ Backend responded with HTTP $HTTP_STATUS at $checked_at" >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            unconfigured)
+              echo "::warning title=Keep-alive not configured::Set the BACKEND_HEALTH_URL secret or variable (see docs/keep-alive.md). Skipped the ping."
+              echo "⚠️ BACKEND_HEALTH_URL is not set; no ping was sent." >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            *)
+              echo "::error title=Backend unreachable::Health check failed with HTTP ${HTTP_STATUS:-000} at $checked_at"
+              echo "❌ Backend did not respond successfully (HTTP ${HTTP_STATUS:-000}) at $checked_at" >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+              ;;
+          esac
