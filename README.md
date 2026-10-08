@@ -313,11 +313,11 @@ The backend independently rejects double completes (`409 session_closed`).
 
 ## API overview
 
-All endpoints are under `/api` and act as the default learner (no auth). Full schemas: `/docs`.
+All endpoints except the health check are under `/api` and act as the default learner (no auth). Full schemas: `/docs`.
 
 | Method | Path | Description |
 | --- | --- | --- |
-| `GET` | `/health` | Liveness check |
+| `GET` `HEAD` | `/health` (root, not under `/api`) | Keep-alive / uptime probe → `{"status": "ok"}`; no database access |
 | `GET` | `/me` | Learner stats: XP, gems, hearts (+ next heart time), streak + week, daily goal, settings |
 | `PATCH` | `/me/settings` | Update `display_name`, `daily_goal_xp`, `sound_enabled` |
 | `POST` | `/me/hearts/refill` | Spend 350 gems to refill hearts |
@@ -357,7 +357,7 @@ Codes: `skill_locked` (403), `out_of_hearts`, `skill_legendary`, `nothing_to_pra
 ## Testing
 
 ```bash
-# backend — 43 tests: pure rules + full API flows on a temporary database
+# backend — 47 tests: pure rules + full API flows on a temporary database
 cd backend && pytest
 
 # frontend — type check, lint and production build
@@ -383,6 +383,11 @@ process works the same way.
 
 **Frontend → Vercel.** Import the repo, set **Root Directory** to `frontend`, and add
 `NEXT_PUBLIC_API_URL=https://<your-backend>`.
+
+**Keeping the backend awake.** Render's free tier spins services down after 15 idle minutes. A
+GitHub Actions workflow ([`keep-alive.yml`](.github/workflows/keep-alive.yml)) pings `/health` every
+10 minutes, with cron-job.org or UptimeRobot as a backup. Setup takes a few minutes:
+[`docs/keep-alive.md`](docs/keep-alive.md).
 
 ## Assumptions and limitations
 

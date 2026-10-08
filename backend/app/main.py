@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import Settings, load_settings
 from app.database import connect, init_schema, is_seeded
 from app.errors import register_error_handlers
-from app.routers import course, dev, leaderboard, me, sessions
+from app.routers import course, dev, health, leaderboard, me, sessions
 from app.seed import seed_database
 
 
@@ -49,14 +49,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     register_error_handlers(app)
 
+    app.include_router(health.router)
     for router in (me.router, course.router, sessions.router, leaderboard.router):
         app.include_router(router, prefix="/api")
     if settings.enable_dev_routes:
         app.include_router(dev.router, prefix="/api")
-
-    @app.get("/api/health", tags=["health"])
-    def health() -> dict[str, str]:
-        return {"status": "ok"}
 
     return app
 
