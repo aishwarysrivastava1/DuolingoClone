@@ -203,6 +203,26 @@ export function GearIcon(props: IconProps) {
   );
 }
 
+export function MailIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="3" y="5" width="18" height="14" rx="3" fill="none" stroke="currentColor" strokeWidth="2.4" />
+      <path d="m6.8 9.2 5.2 3.8 5.2-3.8" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function GraduationCapIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M12 3.5 22.5 8.5 12 13.5 1.5 8.5Z" fill="currentColor" strokeLinejoin="round" />
+      <path d="M5.5 11.5v4c0 1.9 2.9 3.6 6.5 3.6s6.5-1.7 6.5-3.6v-4L12 14.6Z" fill="currentColor" />
+      <path d="M20.5 9.5V15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="20.5" cy="16" r="1.3" fill="currentColor" />
+    </Svg>
+  );
+}
+
 export function ChevronDownIcon(props: IconProps) {
   return (
     <Svg {...props}>

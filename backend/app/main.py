@@ -45,7 +45,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(
         title="Duolingo Clone API",
         version="1.0.0",
-        description="Course content, lesson sessions and gamification for the Duolingo clone.",
+        description="Course content, lesson sessions and gamification for the Duolingo clone. Built by Aishwary Srivastava.",
+        contact={"name": "Aishwary Srivastava", "email": "asrivastava1_be23@thapar.edu"},
         lifespan=lifespan,
     )
     app.state.settings = settings

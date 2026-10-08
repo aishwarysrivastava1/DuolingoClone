@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Button } from "@/components/ui/Button";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { ComingSoonBadge } from "@/components/ui/StatusScreens";
 import { Toggle } from "@/components/ui/Toggle";
@@ -11,6 +11,7 @@ import { useToast } from "@/context/ToastContext";
 import { useUser } from "@/context/UserContext";
 import { useApiResource } from "@/hooks/useApiResource";
 import { api, toApiError } from "@/lib/api";
+import { AUTHOR } from "@/lib/author";
 import { cn } from "@/lib/cn";
 import { parseLocalDate } from "@/lib/format";
 import type { DailyGoalXp, SettingsPatch } from "@/lib/types";
@@ -159,6 +160,15 @@ export default function SettingsPage() {
           </Row>
         </section>
       )}
+
+      <section className="card px-5 py-2">
+        <h2 className="pt-3 text-lg font-extrabold">About</h2>
+        <Row title={`Built by ${AUTHOR.name}`} description={AUTHOR.university}>
+          <ButtonLink href="/contact" variant="outline" className="shrink-0">
+            Contact
+          </ButtonLink>
+        </Row>
+      </section>
 
       <Modal open={confirmReset} onClose={() => setConfirmReset(false)} labelledBy="reset-title">
         <h2 id="reset-title" className="text-center text-2xl font-extrabold">

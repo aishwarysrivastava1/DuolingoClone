@@ -11,7 +11,7 @@ interface HoverPopoverProps {
   children: (close: () => void) => React.ReactNode;
 }
 
-const DEFAULT_TRIGGER = "flex items-center gap-1.5 rounded-xl px-2 py-1.5 text-[17px] font-extrabold hover:bg-surface-2";
+const DEFAULT_TRIGGER = "flex items-center gap-1.5 rounded-xl px-1.5 py-1.5 text-[17px] font-extrabold hover:bg-surface-2 sm:px-2";
 
 const ALIGN = {
   left: "left-0",
