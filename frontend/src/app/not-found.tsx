@@ -1,4 +1,5 @@
 import { Mascot } from "@/components/Mascot";
+import { SiteFooter } from "@/components/shell/SiteFooter";
 import { ButtonLink } from "@/components/ui/Button";
 
 export default function NotFound() {
@@ -10,6 +11,7 @@ export default function NotFound() {
       <ButtonLink href="/learn" variant="secondary" className="w-56">
         Back to learning
       </ButtonLink>
+      <SiteFooter variant="compact" className="mt-8" />
     </div>
   );
 }

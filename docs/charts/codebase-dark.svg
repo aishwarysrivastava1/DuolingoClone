@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="384" viewBox="0 0 820 384" role="img" aria-labelledby="t d" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif">
+<title id="t">Codebase at a glance: 7,958 lines</title>
+<desc id="d">Bar chart of non-blank lines of code: frontend UI (TSX) 3,569; backend app (Python) 2,388; frontend logic (TS) 802; backend tests (Python) 556; styles (CSS) 376; database schema (SQL) 180; scripts (Python) 87.</desc>
+<rect x="0.5" y="0.5" width="819" height="383" rx="12" fill="#0d1117" stroke="#3d444d"/>
+<text x="28" y="46" font-size="18" font-weight="700" fill="#f0f6fc">Codebase at a glance: 7,958 lines</text>
+<text x="28" y="68" font-size="13" fill="#9198a1">Non-blank lines in tracked source files, by area</text>
+<text x="28" y="113.0" font-size="14" fill="#f0f6fc">Frontend UI (TSX)</text>
+<path d="M238.0,98.0 H698.0 A4,4 0 0 1 702.0,102.0 V114.0 A4,4 0 0 1 698.0,118.0 H238.0 V98.0 Z" fill="#1899d6"/>
+<text x="710.0" y="113.0" font-size="14" font-weight="600" fill="#f0f6fc">3,569</text>
+<text x="28" y="151.0" font-size="14" fill="#f0f6fc">Backend app (Python)</text>
+<path d="M238.0,136.0 H544.5 A4,4 0 0 1 548.5,140.0 V152.0 A4,4 0 0 1 544.5,156.0 H238.0 V136.0 Z" fill="#1899d6"/>
+<text x="556.5" y="151.0" font-size="14" font-weight="600" fill="#f0f6fc">2,388</text>
+<text x="28" y="189.0" font-size="14" fill="#f0f6fc">Frontend logic (TS)</text>
+<path d="M238.0,174.0 H338.3 A4,4 0 0 1 342.3,178.0 V190.0 A4,4 0 0 1 338.3,194.0 H238.0 V174.0 Z" fill="#1899d6"/>
+<text x="350.3" y="189.0" font-size="14" font-weight="600" fill="#f0f6fc">802</text>
+<text x="28" y="227.0" font-size="14" fill="#f0f6fc">Backend tests (Python)</text>
+<path d="M238.0,212.0 H306.3 A4,4 0 0 1 310.3,216.0 V228.0 A4,4 0 0 1 306.3,232.0 H238.0 V212.0 Z" fill="#1899d6"/>
+<text x="318.3" y="227.0" font-size="14" font-weight="600" fill="#f0f6fc">556</text>
+<text x="28" y="265.0" font-size="14" fill="#f0f6fc">Styles (CSS)</text>
+<path d="M238.0,250.0 H282.9 A4,4 0 0 1 286.9,254.0 V266.0 A4,4 0 0 1 282.9,270.0 H238.0 V250.0 Z" fill="#1899d6"/>
+<text x="294.9" y="265.0" font-size="14" font-weight="600" fill="#f0f6fc">376</text>
+<text x="28" y="303.0" font-size="14" fill="#f0f6fc">Database schema (SQL)</text>
+<path d="M238.0,288.0 H257.4 A4,4 0 0 1 261.4,292.0 V304.0 A4,4 0 0 1 257.4,308.0 H238.0 V288.0 Z" fill="#1899d6"/>
+<text x="269.4" y="303.0" font-size="14" font-weight="600" fill="#f0f6fc">180</text>
+<text x="28" y="341.0" font-size="14" fill="#f0f6fc">Scripts (Python)</text>
+<path d="M238.0,326.0 H245.3 A4,4 0 0 1 249.3,330.0 V342.0 A4,4 0 0 1 245.3,346.0 H238.0 V326.0 Z" fill="#1899d6"/>
+<text x="257.3" y="341.0" font-size="14" font-weight="600" fill="#f0f6fc">87</text>
+<line x1="238" y1="90" x2="238" y2="354" stroke="#3d444d" stroke-width="1"/>
+</svg>

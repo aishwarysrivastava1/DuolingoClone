@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
-import { DumbbellIcon, GearIcon, MoreNavIcon } from "@/components/icons";
+import { DumbbellIcon, GearIcon, MailIcon, MoreNavIcon } from "@/components/icons";
 import { Mascot } from "@/components/Mascot";
 import { useToast } from "@/context/ToastContext";
 import { useUser } from "@/context/UserContext";
@@ -78,6 +78,9 @@ export function Sidebar() {
               </Link>
               <Link href="/practice" onClick={close} className="flex items-center gap-3 rounded-xl p-3 font-extrabold text-muted hover:bg-surface-2">
                 <DumbbellIcon className="size-6" /> Practice
+              </Link>
+              <Link href="/contact" onClick={close} className="flex items-center gap-3 rounded-xl p-3 font-extrabold text-muted hover:bg-surface-2">
+                <MailIcon className="size-6" /> Contact
               </Link>
               <button
                 type="button"
