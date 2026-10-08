@@ -41,6 +41,7 @@ export interface Me {
   avatar_color: string;
   joined_on: string;
   today: string;
+  server_time: string;
   course: Course;
   total_xp: number;
   gems: number;

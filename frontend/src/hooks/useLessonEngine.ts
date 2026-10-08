@@ -156,6 +156,9 @@ export function useLessonEngine(mode: SessionMode, skillId: number | null) {
     }
   }, [mode, skillId]);
 
+  // Hearts change during play; re-sync the shared stats however the learner leaves.
+  useEffect(() => () => void refresh(), [refresh]);
+
   // Start exactly once, even under React Strict Mode's double effects.
   const started = useRef(false);
   useEffect(() => {

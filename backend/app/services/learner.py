@@ -115,6 +115,7 @@ def build_me(conn: sqlite3.Connection, user_id: int, clock: Clock, interval: tim
         avatar_color=user["avatar_color"],
         joined_on=date.fromisoformat(user["joined_on"]),
         today=clock.today,
+        server_time=clock.now,
         course=course_out(conn, user["course_id"]),
         total_xp=user["total_xp"],
         gems=user["gems"],

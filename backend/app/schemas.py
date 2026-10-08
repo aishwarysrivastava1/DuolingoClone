@@ -60,6 +60,7 @@ class MeOut(BaseModel):
     avatar_color: str
     joined_on: date
     today: date
+    server_time: datetime  # lets the client correct countdowns for the simulated clock
     course: CourseOut
     total_xp: int
     gems: int

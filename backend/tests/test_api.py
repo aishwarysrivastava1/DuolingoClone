@@ -13,6 +13,14 @@ def test_me_returns_seeded_learner(client):
     assert me["daily_goal"] == {"goal_xp": 20, "today_xp": 0, "completed": False}
 
 
+def test_me_reports_the_simulated_server_time(client):
+    before = client.get("/api/me").json()
+    client.post("/api/dev/advance-day", json={"days": 2})
+    after = client.get("/api/me").json()
+    assert after["server_time"][:10] > before["server_time"][:10]
+    assert after["today"] > before["today"]
+
+
 def test_path_reports_completed_active_and_locked_skills(client):
     units = client.get("/api/path").json()["units"]
     skills = [skill for unit in units for skill in unit["skills"]]
